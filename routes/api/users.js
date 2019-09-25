@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 // bring in User model
 const User = require("../../models/User");
+const gravatar = require("gravatar");
+const bcrypt = require("bcryptjs");
 
 // @route   POST api/users/register
 // @desc    Register a user
@@ -22,10 +24,35 @@ router.post("/register", (req, res) => {
           email: "Email already exists"
         });
       } else {
+        // based on gravatar's api (url function, s,r,d, etc.)
+        // gravatar uses user email to provide gravatar image
+        const avatar = gravatar.url(req.body.email, {
+          s: "200",
+          r: "pg",
+          d: "mm"
+        });
+        // building new user object to write to database
         const newUser = new User({
           name: req.body.name,
           email: req.body.email,
+          // avatar uses deconstruction since column and variable name are same
+          avatar,
           password: req.body.password
+        });
+        // bcrypt has genSalt function
+        // 10 (default) is for rounds, err & salt are parameters for callback function
+        bcrypt.genSalt(10, (err, salt) => {
+          if (err) throw err;
+          // bcrypt hash takes in two parameters (password and salt) and callback (asynchronous function)
+          bcrypt.hash(newUser.password, salt, (err, hash) => {
+            if (err) throw err;
+            // put new hashed password as user password in database
+            newUser.password = hash;
+            newUser
+              .save() //mongoose feature
+              .then(user => res.json(user))
+              .catch(err => console.log(err));
+          });
         });
       }
     })
